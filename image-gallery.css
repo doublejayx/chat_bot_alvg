@@ -1,4 +1,9 @@
-﻿/* Styles for image-gallery.html */
+﻿/* ============================================================
+   image-gallery-enhanced.css
+   Original styles + full animation & UX upgrade package
+   ============================================================ */
+
+/* ─── CSS Variables ─────────────────────────────────────── */
 :root {
   --primary: #1a56db;
   --primary-hover: #1e40af;
@@ -24,6 +29,7 @@
   --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.08), 0 4px 6px -4px rgba(0,0,0,0.05);
   --shadow-xl: 0 20px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.04);
   --shadow-chat: 0 25px 50px -12px rgba(0,0,0,0.2);
+  --shadow-glow: 0 0 40px rgba(26, 86, 219, 0.15);
   --radius-sm: 8px;
   --radius-md: 12px;
   --radius-lg: 16px;
@@ -33,6 +39,17 @@
   --transition-base: 250ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-slow: 350ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-spring: 500ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  --transition-bounce: 300ms cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* NEW: shimmer gradient for skeleton & text */
+  --shimmer-gradient: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255,255,255,0.5) 40%,
+    rgba(255,255,255,0.8) 50%,
+    rgba(255,255,255,0.5) 60%,
+    transparent 100%
+  );
 }
 
 [data-theme="dark"] {
@@ -57,9 +74,21 @@
   --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.4), 0 4px 6px -4px rgba(0,0,0,0.3);
   --shadow-xl: 0 20px 25px -5px rgba(0,0,0,0.5), 0 8px 10px -6px rgba(0,0,0,0.3);
   --shadow-chat: 0 25px 50px -12px rgba(0,0,0,0.5);
+  --shadow-glow: 0 0 40px rgba(59, 130, 246, 0.12);
+  --shimmer-gradient: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255,255,255,0.06) 40%,
+    rgba(255,255,255,0.12) 50%,
+    rgba(255,255,255,0.06) 60%,
+    transparent 100%
+  );
 }
 
-* {
+/* ─── Reset ──────────────────────────────────────────────── */
+*,
+*::before,
+*::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
@@ -95,17 +124,27 @@ a:focus-visible {
   outline-offset: 3px;
 }
 
+/* ─── Navigation ─────────────────────────────────────────── */
 .nav {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
-  background: color-mix(in srgb, var(--bg-card) 92%, transparent);
+  background: color-mix(in srgb, var(--bg-card) 80%, transparent);
   border-bottom: 1px solid var(--border);
   box-shadow: var(--shadow-sm);
-  backdrop-filter: blur(16px);
+  /* ENHANCED: stronger blur + subtle backdrop */
+  backdrop-filter: blur(24px) saturate(1.6);
+  -webkit-backdrop-filter: blur(24px) saturate(1.6);
   z-index: 100;
-  transition: background var(--transition-base), border-color var(--transition-base);
+  transition: background var(--transition-base), border-color var(--transition-base),
+              box-shadow var(--transition-base);
+}
+
+/* Nav scrolled state — add in JS: document.addEventListener('scroll',()=>
+   nav.classList.toggle('scrolled', scrollY > 20)) */
+.nav.scrolled {
+  box-shadow: 0 4px 24px rgba(0,0,0,0.08);
 }
 
 .nav-inner {
@@ -137,7 +176,15 @@ a:focus-visible {
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  box-shadow: 0 8px 20px rgba(26, 86, 219, 0.26);
+  /* ENHANCED: animated glow */
+  box-shadow: 0 8px 20px rgba(26, 86, 219, 0.3), 0 0 0 0 rgba(26, 86, 219, 0.4);
+  animation: brandPulse 3s ease-in-out infinite;
+  transition: transform var(--transition-bounce);
+}
+
+.brand-mark:hover,
+.brand:hover .brand-mark {
+  transform: rotate(-6deg) scale(1.1);
 }
 
 .brand-logo {
@@ -175,12 +222,44 @@ a:focus-visible {
   text-decoration: none;
   font-size: 14px;
   font-weight: 600;
-  transition: background var(--transition-fast), color var(--transition-fast);
+  transition: background var(--transition-fast), color var(--transition-fast),
+              box-shadow var(--transition-fast);
+  position: relative;
 }
 
 .nav-link:hover {
   background: var(--primary-light);
   color: var(--primary);
+}
+
+/* ENHANCED: active indicator underline */
+.nav-link.active {
+  color: var(--primary);
+  background: var(--primary-light);
+  box-shadow: inset 0 -2px 0 var(--primary);
+}
+
+/* ENHANCED: hover underline slide-in */
+.nav-link::after {
+  content: '';
+  position: absolute;
+  bottom: 4px;
+  left: 12px;
+  right: 12px;
+  height: 2px;
+  background: var(--primary);
+  border-radius: 1px;
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform var(--transition-fast);
+}
+
+.nav-link:hover::after {
+  transform: scaleX(1);
+}
+
+.nav-link.active::after {
+  transform: scaleX(1);
 }
 
 .theme-toggle-btn {
@@ -193,20 +272,27 @@ a:focus-visible {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all var(--transition-fast);
+  transition: all var(--transition-bounce);
 }
 
 .theme-toggle-btn:hover {
   border-color: var(--primary);
   color: var(--primary);
   background: var(--primary-light);
+  transform: rotate(20deg) scale(1.08);
 }
 
+.theme-toggle-btn:active {
+  transform: rotate(180deg) scale(0.9);
+}
+
+/* ─── Container ──────────────────────────────────────────── */
 .container {
   width: min(1200px, calc(100% - 48px));
   margin: 0 auto;
 }
 
+/* ─── Hero ───────────────────────────────────────────────── */
 .hero {
   min-height: 92vh;
   display: flex;
@@ -214,6 +300,7 @@ a:focus-visible {
   justify-content: center;
   position: relative;
   padding: 120px 24px 80px;
+  overflow: hidden;
 }
 
 .hero-gradient {
@@ -224,6 +311,37 @@ a:focus-visible {
     radial-gradient(ellipse at 70% 80%, var(--primary-subtle) 0%, transparent 50%);
   opacity: 0.62;
   pointer-events: none;
+  /* ENHANCED: gradient shifts slowly */
+  animation: heroGradientDrift 12s ease-in-out infinite alternate;
+}
+
+/* ENHANCED: floating orbs */
+.hero::before,
+.hero::after {
+  content: '';
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  filter: blur(80px);
+  opacity: 0.18;
+}
+
+.hero::before {
+  width: 500px;
+  height: 500px;
+  background: var(--primary);
+  top: -100px;
+  left: -150px;
+  animation: orbFloat 10s ease-in-out infinite;
+}
+
+.hero::after {
+  width: 400px;
+  height: 400px;
+  background: var(--accent);
+  bottom: -80px;
+  right: -100px;
+  animation: orbFloat 14s ease-in-out infinite reverse;
 }
 
 .hero-content {
@@ -244,6 +362,9 @@ a:focus-visible {
   font-weight: 700;
   margin-bottom: 28px;
   border: 1px solid rgba(26, 86, 219, 0.18);
+  /* ENHANCED: entrance + subtle pulse */
+  animation: eyebrowIn 0.7s var(--transition-spring) both,
+             eyebrowPulse 4s 1s ease-in-out infinite;
 }
 
 .hero h1 {
@@ -253,13 +374,24 @@ a:focus-visible {
   letter-spacing: 0;
   margin-bottom: 24px;
   color: var(--text-primary);
+  /* ENHANCED: word-by-word reveal */
+  animation: heroTitleIn 0.8s 0.2s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
+/* ENHANCED: shimmer + animated gradient text */
 .gradient-text {
-  background: linear-gradient(135deg, var(--primary), var(--accent));
+  background: linear-gradient(
+    135deg,
+    var(--primary) 0%,
+    var(--accent) 40%,
+    var(--primary) 70%,
+    var(--accent) 100%
+  );
+  background-size: 200% auto;
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
+  animation: shimmerText 3s linear infinite;
 }
 
 .hero p {
@@ -268,6 +400,7 @@ a:focus-visible {
   color: var(--text-secondary);
   font-size: 18px;
   line-height: 1.7;
+  animation: heroSubIn 0.8s 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 .hero-actions {
@@ -275,8 +408,10 @@ a:focus-visible {
   justify-content: center;
   flex-wrap: wrap;
   gap: 14px;
+  animation: heroActionsIn 0.8s 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
+/* ─── Buttons ────────────────────────────────────────────── */
 .btn {
   min-height: 50px;
   display: inline-flex;
@@ -291,13 +426,41 @@ a:focus-visible {
   text-decoration: none;
   font-size: 16px;
   font-weight: 700;
-  transition: transform var(--transition-fast), box-shadow var(--transition-fast), background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+  position: relative;
+  overflow: hidden;
+  /* ENHANCED: spring hover */
+  transition: transform var(--transition-bounce),
+              box-shadow var(--transition-base),
+              background var(--transition-fast),
+              border-color var(--transition-fast),
+              color var(--transition-fast);
+}
+
+/* ENHANCED: ripple layer */
+.btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--shimmer-gradient);
+  background-size: 200% 100%;
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+
+.btn:hover::before {
+  opacity: 1;
+  animation: shimmerMove 0.6s ease forwards;
 }
 
 .btn:hover {
-  transform: translateY(-1px);
+  transform: translateY(-3px) scale(1.02);
   background: var(--primary-hover);
-  box-shadow: 0 14px 28px rgba(26, 86, 219, 0.22);
+  box-shadow: 0 14px 32px rgba(26, 86, 219, 0.28), 0 4px 12px rgba(26, 86, 219, 0.18);
+}
+
+.btn:active {
+  transform: translateY(0) scale(0.97);
+  box-shadow: 0 2px 8px rgba(26, 86, 219, 0.2);
 }
 
 .btn.secondary {
@@ -311,8 +474,10 @@ a:focus-visible {
   color: var(--primary);
   border-color: var(--primary);
   background: var(--primary-light);
+  box-shadow: 0 8px 20px rgba(26, 86, 219, 0.12);
 }
 
+/* ─── Sections ───────────────────────────────────────────── */
 .section {
   padding: 80px 0;
   scroll-margin-top: 88px;
@@ -339,6 +504,7 @@ a:focus-visible {
   line-height: 1.7;
 }
 
+/* ─── Summary Cards ──────────────────────────────────────── */
 .summary-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -352,18 +518,30 @@ a:focus-visible {
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  transition: background var(--transition-base), border-color var(--transition-base), box-shadow var(--transition-base), transform var(--transition-base);
+  transition: background var(--transition-base), border-color var(--transition-base),
+              box-shadow var(--transition-base), transform var(--transition-bounce);
 }
 
 .summary-card {
   padding: 24px;
   box-shadow: var(--shadow-sm);
+  /* ENHANCED: stagger in */
+  opacity: 0;
+  transform: translateY(24px);
+}
+
+.summary-card.visible {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 0.5s ease, transform 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+              background var(--transition-base), border-color var(--transition-base),
+              box-shadow var(--transition-base);
 }
 
 .summary-card:hover,
 .feature-card:hover {
-  transform: translateY(-4px);
-  box-shadow: var(--shadow-lg);
+  transform: translateY(-6px);
+  box-shadow: var(--shadow-lg), var(--shadow-glow);
   border-color: var(--primary);
 }
 
@@ -382,6 +560,9 @@ a:focus-visible {
   font-size: 30px;
   font-weight: 800;
   line-height: 1;
+  /* ENHANCED: counter animation driven by JS */
+  font-variant-numeric: tabular-nums;
+  transition: color var(--transition-base);
 }
 
 .summary-note {
@@ -391,6 +572,7 @@ a:focus-visible {
   font-weight: 700;
 }
 
+/* ─── Content Panel ──────────────────────────────────────── */
 .content-panel {
   overflow: hidden;
   box-shadow: var(--shadow-md);
@@ -434,7 +616,8 @@ a:focus-visible {
   font-size: 13px;
   font-weight: 700;
   white-space: nowrap;
-  transition: background var(--transition-base), border-color var(--transition-base), color var(--transition-base);
+  transition: background var(--transition-base), border-color var(--transition-base),
+              color var(--transition-base);
 }
 
 .status-dot {
@@ -445,6 +628,7 @@ a:focus-visible {
   animation: statusPulse 2s ease-in-out infinite;
 }
 
+/* ─── Gallery ────────────────────────────────────────────── */
 .gallery-container {
   min-height: 380px;
   display: grid;
@@ -463,14 +647,21 @@ a:focus-visible {
   background: var(--bg-card);
   border: 1px solid var(--border);
   box-shadow: var(--shadow-sm);
+  /* ENHANCED: spring hover, stagger from JS */
+  transition: transform var(--transition-bounce), box-shadow var(--transition-base),
+              border-color var(--transition-base);
   animation: itemIn var(--transition-spring) both;
-  transition: transform var(--transition-base), box-shadow var(--transition-base), border-color var(--transition-base);
+  cursor: pointer;
 }
 
 .image-card:hover {
-  transform: translateY(-4px);
+  transform: translateY(-6px) scale(1.02);
   border-color: var(--primary);
-  box-shadow: var(--shadow-lg);
+  box-shadow: var(--shadow-lg), 0 0 0 3px var(--primary-light);
+}
+
+.image-card:active {
+  transform: translateY(-2px) scale(0.99);
 }
 
 .image-card img {
@@ -478,6 +669,63 @@ a:focus-visible {
   height: 100%;
   object-fit: cover;
   display: block;
+  transition: transform var(--transition-slow), filter var(--transition-slow);
+}
+
+/* ENHANCED: zoom image + darken on hover */
+.image-card:hover img {
+  transform: scale(1.08);
+  filter: brightness(0.82) saturate(1.1);
+}
+
+/* ENHANCED: overlay with view icon */
+.image-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    rgba(26, 86, 219, 0.3) 0%,
+    rgba(14, 165, 233, 0.15) 100%
+  );
+  opacity: 0;
+  transition: opacity var(--transition-base);
+  border-radius: var(--radius-lg);
+  pointer-events: none;
+}
+
+.image-card:hover::after {
+  opacity: 1;
+}
+
+/* ENHANCED: view button appears on hover */
+.image-card-view {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -30%) scale(0.7);
+  opacity: 0;
+  background: rgba(255,255,255,0.95);
+  color: var(--primary);
+  border: none;
+  border-radius: var(--radius-full);
+  padding: 8px 18px;
+  font-size: 12px;
+  font-weight: 800;
+  pointer-events: none;
+  z-index: 2;
+  white-space: nowrap;
+  transition: opacity var(--transition-base), transform var(--transition-spring);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.image-card:hover .image-card-view {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+  pointer-events: auto;
 }
 
 .image-name {
@@ -499,6 +747,13 @@ a:focus-visible {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  z-index: 2;
+  transition: transform var(--transition-base), opacity var(--transition-base);
+}
+
+.image-card:hover .image-name {
+  transform: translateY(4px);
+  opacity: 0;
 }
 
 .delete-btn {
@@ -514,7 +769,9 @@ a:focus-visible {
   display: grid;
   place-items: center;
   opacity: 0;
-  transition: opacity var(--transition-fast), background var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
+  z-index: 3;
+  transition: opacity var(--transition-fast), background var(--transition-fast),
+              color var(--transition-fast), transform var(--transition-bounce);
 }
 
 .image-card:hover .delete-btn,
@@ -523,9 +780,10 @@ a:focus-visible {
 }
 
 .delete-btn:hover {
-  transform: scale(1.04);
+  transform: scale(1.12) rotate(8deg);
   background: #fee2e2;
   color: #b91c1c;
+  border-color: #fca5a5;
 }
 
 .delete-btn svg {
@@ -534,6 +792,27 @@ a:focus-visible {
   fill: currentColor;
 }
 
+/* ─── Skeleton Loading ───────────────────────────────────── */
+/* ENHANCED: skeleton cards while gallery loads */
+.skeleton-card {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: var(--radius-lg);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.skeleton-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--shimmer-gradient);
+  background-size: 200% 100%;
+  animation: skeletonShimmer 1.6s ease-in-out infinite;
+}
+
+/* ─── Empty State ────────────────────────────────────────── */
 .empty-gallery {
   min-height: 330px;
   grid-column: 1 / -1;
@@ -559,6 +838,8 @@ a:focus-visible {
   justify-content: center;
   margin: 0 auto 18px;
   transition: background var(--transition-base), color var(--transition-base);
+  /* ENHANCED: float */
+  animation: floatIcon 3s ease-in-out infinite;
 }
 
 .empty-state h3 {
@@ -574,6 +855,7 @@ a:focus-visible {
   line-height: 1.65;
 }
 
+/* ─── Feature Cards ──────────────────────────────────────── */
 .feature-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -582,10 +864,36 @@ a:focus-visible {
 
 .feature-card {
   padding: 32px;
+  /* ENHANCED: stagger */
+  opacity: 0;
+  transform: translateY(24px);
+}
+
+.feature-card.visible {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 0.5s ease, transform 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+              background var(--transition-base), border-color var(--transition-base),
+              box-shadow var(--transition-base);
 }
 
 .feature-icon {
   margin: 0 0 20px;
+  animation: floatIcon 3.5s ease-in-out infinite;
+}
+
+.feature-card:nth-child(2) .feature-icon {
+  animation-delay: 0.5s;
+}
+
+.feature-card:nth-child(3) .feature-icon {
+  animation-delay: 1s;
+}
+
+.feature-card:hover .feature-icon {
+  background: var(--primary);
+  color: white;
+  transform: scale(1.1) rotate(-5deg);
 }
 
 .feature-card h3 {
@@ -601,9 +909,25 @@ a:focus-visible {
   line-height: 1.7;
 }
 
+/* ─── Stats Band ─────────────────────────────────────────── */
 .stats-band {
   padding: 60px 24px;
-  background: var(--primary);
+  /* ENHANCED: animated gradient */
+  background: linear-gradient(135deg, #1a56db 0%, #0ea5e9 50%, #1e40af 100%);
+  background-size: 300% 300%;
+  animation: gradientShift 8s ease infinite;
+  position: relative;
+  overflow: hidden;
+}
+
+/* ENHANCED: pattern overlay */
+.stats-band::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px);
+  background-size: 28px 28px;
+  pointer-events: none;
 }
 
 .stats-grid {
@@ -613,6 +937,7 @@ a:focus-visible {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 32px;
   text-align: center;
+  position: relative;
 }
 
 .stat-value {
@@ -620,20 +945,25 @@ a:focus-visible {
   font-size: 42px;
   font-weight: 800;
   line-height: 1;
+  /* ENHANCED: counter anim target */
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 2px 12px rgba(0,0,0,0.15);
 }
 
 .stat-label {
   margin-top: 8px;
-  color: rgba(255, 255, 255, 0.72);
+  color: rgba(255, 255, 255, 0.78);
   font-size: 14px;
   font-weight: 700;
 }
 
+/* ─── Patterns ───────────────────────────────────────────── */
 .pattern-dots {
   background-image: radial-gradient(circle, var(--border) 1px, transparent 1px);
   background-size: 24px 24px;
 }
 
+/* ─── CTA Section ────────────────────────────────────────── */
 .cta-section {
   position: relative;
   padding: 100px 24px;
@@ -667,6 +997,7 @@ a:focus-visible {
   margin-bottom: 34px;
 }
 
+/* ─── Footer ─────────────────────────────────────────────── */
 .footer {
   background: var(--bg-card);
   border-top: 1px solid var(--border);
@@ -689,12 +1020,13 @@ a:focus-visible {
   font-size: 13px;
 }
 
+/* ─── Toast ──────────────────────────────────────────────── */
 .toast {
   position: fixed;
   top: 86px;
   left: 50%;
   min-height: 44px;
-  transform: translate(-50%, -90px);
+  transform: translate(-50%, -200px);
   display: flex;
   align-items: center;
   gap: 8px;
@@ -708,7 +1040,8 @@ a:focus-visible {
   font-weight: 700;
   z-index: 10000;
   pointer-events: none;
-  transition: transform var(--transition-spring), background var(--transition-base), border-color var(--transition-base), color var(--transition-base);
+  transition: transform var(--transition-spring), background var(--transition-base),
+              border-color var(--transition-base), color var(--transition-base);
 }
 
 .toast.show {
@@ -725,6 +1058,7 @@ a:focus-visible {
   transform: translate(-50%, 0);
 }
 
+/* ─── Chat Toggle Button ─────────────────────────────────── */
 .chat-toggle {
   position: fixed;
   bottom: 28px;
@@ -737,19 +1071,25 @@ a:focus-visible {
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 8px 24px rgba(26, 86, 219, 0.4);
+  /* ENHANCED: stronger glow, spring anim */
+  box-shadow: 0 8px 24px rgba(26, 86, 219, 0.45),
+              0 0 0 0 rgba(26, 86, 219, 0.3);
+  animation: chatBtnPulse 3s ease-in-out infinite;
   z-index: 1000;
-  transition: transform var(--transition-spring), box-shadow var(--transition-base), background var(--transition-base), opacity var(--transition-fast);
+  transition: transform var(--transition-spring), box-shadow var(--transition-base),
+              background var(--transition-base), opacity var(--transition-fast);
 }
 
 .chat-toggle:hover {
-  transform: scale(1.08);
-  box-shadow: 0 12px 32px rgba(26, 86, 219, 0.5);
+  transform: scale(1.1) translateY(-3px);
+  box-shadow: 0 16px 40px rgba(26, 86, 219, 0.5),
+              0 0 0 8px rgba(26, 86, 219, 0.1);
   background: var(--primary-hover);
+  animation: none;
 }
 
 .chat-toggle:active {
-  transform: scale(0.96);
+  transform: scale(0.94);
 }
 
 .chat-toggle .icon-chat,
@@ -797,7 +1137,7 @@ a:focus-visible {
   align-items: center;
   justify-content: center;
   border: 3px solid var(--bg-main);
-  animation: badgePulse 2s ease-in-out infinite;
+  animation: badgeBounce 2s ease-in-out infinite;
   transition: border-color var(--transition-base), opacity var(--transition-fast);
 }
 
@@ -805,6 +1145,7 @@ a:focus-visible {
   display: none;
 }
 
+/* ─── Chat Window ────────────────────────────────────────── */
 .chat-window {
   position: fixed;
   bottom: 104px;
@@ -813,19 +1154,23 @@ a:focus-visible {
   height: 620px;
   max-width: calc(100vw - 48px);
   max-height: calc(100vh - 140px);
-  background: var(--bg-card);
+  /* ENHANCED: glassmorphism */
+  background: color-mix(in srgb, var(--bg-card) 88%, transparent);
+  backdrop-filter: blur(24px) saturate(1.5);
+  -webkit-backdrop-filter: blur(24px) saturate(1.5);
   border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-chat);
+  box-shadow: var(--shadow-chat), 0 0 0 1px rgba(255,255,255,0.1) inset;
   border: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   overflow: hidden;
   z-index: 999;
   opacity: 0;
-  transform: translateY(20px) scale(0.95);
+  transform: translateY(24px) scale(0.93);
   transform-origin: bottom right;
   pointer-events: none;
-  transition: opacity var(--transition-base), transform var(--transition-spring), border-color var(--transition-base), background var(--transition-base);
+  transition: opacity var(--transition-base), transform var(--transition-spring),
+              border-color var(--transition-base), background var(--transition-base);
 }
 
 .chat-window.open {
@@ -852,9 +1197,13 @@ a:focus-visible {
   user-select: none;
 }
 
+/* ─── Chat Header ────────────────────────────────────────── */
 .chat-header {
   padding: 20px 20px 16px;
-  background: var(--primary);
+  /* ENHANCED: animated gradient */
+  background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+  background-size: 200% 200%;
+  animation: gradientShift 6s ease infinite;
   color: white;
   position: relative;
   flex-shrink: 0;
@@ -874,6 +1223,9 @@ a:focus-visible {
   right: 0;
   height: 4px;
   background: linear-gradient(90deg, var(--accent), var(--primary));
+  /* ENHANCED: animated bar */
+  background-size: 200% auto;
+  animation: shimmerMove 2.5s linear infinite;
 }
 
 .chat-header-row {
@@ -894,16 +1246,16 @@ a:focus-visible {
   width: 48px;
   height: 48px;
   border-radius: var(--radius-sm);
-  background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.08)),
-    var(--primary);
-  border: 1px solid rgba(255, 255, 255, 0.24);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  background: linear-gradient(135deg, rgba(255,255,255,0.22), rgba(255,255,255,0.08)), var(--primary);
+  border: 1px solid rgba(255,255,255,0.28);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.2), 0 0 20px rgba(255,255,255,0.1);
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
   overflow: hidden;
+  /* ENHANCED: subtle float */
+  animation: floatIcon 4s ease-in-out infinite;
 }
 
 .assistant-avatar img {
@@ -943,17 +1295,21 @@ a:focus-visible {
   height: 32px;
   border: none;
   border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(255,255,255,0.15);
   color: white;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background var(--transition-fast), transform var(--transition-fast);
+  transition: background var(--transition-fast), transform var(--transition-bounce);
 }
 
 .chat-action-btn:hover {
-  background: rgba(255, 255, 255, 0.24);
-  transform: translateY(-1px);
+  background: rgba(255,255,255,0.28);
+  transform: translateY(-2px) scale(1.08);
+}
+
+.chat-action-btn:active {
+  transform: scale(0.9);
 }
 
 .chat-action-btn svg {
@@ -962,6 +1318,7 @@ a:focus-visible {
   fill: currentColor;
 }
 
+/* ─── Chat Messages ──────────────────────────────────────── */
 .chat-messages {
   flex: 1;
   min-height: 0;
@@ -972,6 +1329,7 @@ a:focus-visible {
   gap: 16px;
   background: var(--bg-secondary);
   transition: background var(--transition-base);
+  scroll-behavior: smooth;
 }
 
 .chat-messages::-webkit-scrollbar {
@@ -991,7 +1349,7 @@ a:focus-visible {
   display: flex;
   gap: 10px;
   align-items: flex-end;
-  animation: msgAppear var(--transition-spring) forwards;
+  animation: msgSlideIn var(--transition-spring) forwards;
   opacity: 0;
 }
 
@@ -1006,6 +1364,11 @@ a:focus-visible {
   font-size: 14px;
   line-height: 1.6;
   word-wrap: break-word;
+  transition: transform var(--transition-fast);
+}
+
+.msg:hover {
+  transform: translateY(-1px);
 }
 
 .msg.bot {
@@ -1019,9 +1382,11 @@ a:focus-visible {
 
 .msg.user {
   align-self: flex-end;
-  background: var(--primary);
+  /* ENHANCED: gradient bg on user messages */
+  background: linear-gradient(135deg, var(--primary), var(--accent));
   color: white;
   border-bottom-right-radius: var(--radius-sm);
+  box-shadow: 0 4px 14px rgba(26, 86, 219, 0.28);
 }
 
 .msg-time {
@@ -1032,7 +1397,7 @@ a:focus-visible {
 }
 
 .msg.user .msg-time {
-  color: rgba(255, 255, 255, 0.72);
+  color: rgba(255,255,255,0.72);
   text-align: right;
 }
 
@@ -1046,6 +1411,11 @@ a:focus-visible {
   font-weight: 800;
   font-size: 13px;
   flex-shrink: 0;
+  transition: transform var(--transition-bounce);
+}
+
+.avatar:hover {
+  transform: scale(1.1) rotate(-4deg);
 }
 
 .avatar-bot {
@@ -1070,17 +1440,13 @@ a:focus-visible {
   height: 8px;
   background: var(--text-tertiary);
   border-radius: var(--radius-full);
-  animation: typingDot 1.4s ease-in-out infinite;
+  animation: typingBounce 1.4s ease-in-out infinite;
 }
 
-.typing-indicator span:nth-child(2) {
-  animation-delay: 0.2s;
-}
+.typing-indicator span:nth-child(2) { animation-delay: 0.16s; }
+.typing-indicator span:nth-child(3) { animation-delay: 0.32s; }
 
-.typing-indicator span:nth-child(3) {
-  animation-delay: 0.4s;
-}
-
+/* ─── Quick Replies ───────────────────────────────────────── */
 .quick-replies {
   display: flex;
   flex-wrap: wrap;
@@ -1098,15 +1464,22 @@ a:focus-visible {
   border-radius: var(--radius-full);
   font-size: 13px;
   font-weight: 700;
-  transition: all var(--transition-fast);
+  transition: all var(--transition-bounce);
 }
 
 .quick-reply-btn:hover,
 .quick-reply-btn:focus-visible {
   background: var(--primary);
   color: white;
+  transform: translateY(-2px) scale(1.04);
+  box-shadow: 0 6px 16px rgba(26, 86, 219, 0.25);
 }
 
+.quick-reply-btn:active {
+  transform: scale(0.96);
+}
+
+/* ─── Chat Input ─────────────────────────────────────────── */
 .chat-input-area {
   padding: 16px 16px 20px;
   background: var(--bg-card);
@@ -1123,12 +1496,13 @@ a:focus-visible {
   border: 2px solid var(--border);
   border-radius: var(--radius-lg);
   padding: 6px 6px 6px 16px;
-  transition: border-color var(--transition-fast), background var(--transition-base), box-shadow var(--transition-fast);
+  transition: border-color var(--transition-fast), background var(--transition-base),
+              box-shadow var(--transition-fast);
 }
 
 .chat-input-wrap:focus-within {
   border-color: var(--border-focus);
-  box-shadow: 0 0 0 4px rgba(26, 86, 219, 0.1);
+  box-shadow: 0 0 0 4px rgba(26, 86, 219, 0.1), 0 4px 16px rgba(26, 86, 219, 0.08);
 }
 
 .chat-input {
@@ -1159,11 +1533,14 @@ a:focus-visible {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  transition: background var(--transition-fast), transform var(--transition-fast), opacity var(--transition-fast);
+  transition: background var(--transition-fast), transform var(--transition-bounce),
+              opacity var(--transition-fast), box-shadow var(--transition-fast);
 }
 
 .send-btn:hover {
   background: var(--primary-hover);
+  transform: scale(1.1) translateY(-1px);
+  box-shadow: 0 6px 16px rgba(26, 86, 219, 0.3);
 }
 
 .send-btn:active {
@@ -1173,6 +1550,7 @@ a:focus-visible {
 .send-btn:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+  transform: none;
 }
 
 .send-btn svg {
@@ -1193,10 +1571,12 @@ a:focus-visible {
   font-weight: 800;
 }
 
+/* ─── Scroll Fade (Intersection Observer) ────────────────── */
 .fade-up {
   opacity: 0;
-  transform: translateY(30px);
-  transition: opacity 0.6s ease, transform 0.6s ease;
+  transform: translateY(32px);
+  transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .fade-up.visible {
@@ -1204,6 +1584,14 @@ a:focus-visible {
   transform: translateY(0);
 }
 
+/* ENHANCED: stagger delay utility classes */
+.delay-100 { transition-delay: 100ms !important; }
+.delay-200 { transition-delay: 200ms !important; }
+.delay-300 { transition-delay: 300ms !important; }
+.delay-400 { transition-delay: 400ms !important; }
+.delay-500 { transition-delay: 500ms !important; }
+
+/* ─── Accessibility ──────────────────────────────────────── */
 .sr-only {
   position: absolute;
   width: 1px;
@@ -1211,36 +1599,124 @@ a:focus-visible {
   padding: 0;
   margin: -1px;
   overflow: hidden;
-  clip: rect(0, 0, 0, 0);
+  clip: rect(0,0,0,0);
   white-space: nowrap;
   border: 0;
 }
 
-@keyframes badgePulse {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.1); }
+/* ─── Keyframe Animations ────────────────────────────────── */
+
+/* Hero entrance */
+@keyframes eyebrowIn {
+  from { opacity: 0; transform: translateY(-16px) scale(0.9); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes heroTitleIn {
+  from { opacity: 0; transform: translateY(24px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes heroSubIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes heroActionsIn {
+  from { opacity: 0; transform: translateY(16px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 
+/* Shimmer text */
+@keyframes shimmerText {
+  0%   { background-position: 200% center; }
+  100% { background-position: -200% center; }
+}
+
+/* Shimmer move (button & header bar) */
+@keyframes shimmerMove {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Skeleton shimmer */
+@keyframes skeletonShimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Gradient shift (stats band, chat header) */
+@keyframes gradientShift {
+  0%,100% { background-position: 0% 50%; }
+  50%      { background-position: 100% 50%; }
+}
+
+/* Hero gradient drift */
+@keyframes heroGradientDrift {
+  0%   { transform: scale(1) translate(0, 0); }
+  100% { transform: scale(1.12) translate(-3%, 2%); }
+}
+
+/* Orb float */
+@keyframes orbFloat {
+  0%,100% { transform: translate(0, 0) scale(1); }
+  33%      { transform: translate(30px, -20px) scale(1.05); }
+  66%      { transform: translate(-20px, 15px) scale(0.96); }
+}
+
+/* Icon float */
+@keyframes floatIcon {
+  0%,100% { transform: translateY(0); }
+  50%      { transform: translateY(-7px); }
+}
+
+/* Eyebrow pulse */
+@keyframes eyebrowPulse {
+  0%,100% { box-shadow: 0 0 0 0 rgba(26, 86, 219, 0.18); }
+  50%      { box-shadow: 0 0 0 6px rgba(26, 86, 219, 0); }
+}
+
+/* Brand pulse */
+@keyframes brandPulse {
+  0%,100% { box-shadow: 0 8px 20px rgba(26, 86, 219, 0.3), 0 0 0 0 rgba(26, 86, 219, 0.3); }
+  50%      { box-shadow: 0 8px 20px rgba(26, 86, 219, 0.3), 0 0 0 8px rgba(26, 86, 219, 0); }
+}
+
+/* Chat button pulse */
+@keyframes chatBtnPulse {
+  0%,100% { box-shadow: 0 8px 24px rgba(26, 86, 219, 0.45), 0 0 0 0 rgba(26, 86, 219, 0.3); }
+  50%      { box-shadow: 0 8px 24px rgba(26, 86, 219, 0.45), 0 0 0 12px rgba(26, 86, 219, 0); }
+}
+
+/* Badge bounce */
+@keyframes badgeBounce {
+  0%,100% { transform: scale(1); }
+  40%      { transform: scale(1.18) rotate(5deg); }
+  60%      { transform: scale(0.92) rotate(-3deg); }
+}
+
+/* Status dot pulse */
 @keyframes statusPulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(16,185,129,0.4); }
-  50% { box-shadow: 0 0 0 6px rgba(16,185,129,0); }
+  0%,100% { box-shadow: 0 0 0 0 rgba(16,185,129,0.5); }
+  50%      { box-shadow: 0 0 0 6px rgba(16,185,129,0); }
 }
 
-@keyframes msgAppear {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
+/* Message slide in */
+@keyframes msgSlideIn {
+  from { opacity: 0; transform: translateY(10px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 
+/* Gallery item in */
 @keyframes itemIn {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; transform: translateY(12px) scale(0.95); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 
-@keyframes typingDot {
-  0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
-  30% { transform: translateY(-6px); opacity: 1; }
+/* Typing bounce */
+@keyframes typingBounce {
+  0%,60%,100% { transform: translateY(0); opacity: 0.4; }
+  30%          { transform: translateY(-7px); opacity: 1; }
 }
 
+/* ─── Reduced Motion ─────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -1252,6 +1728,7 @@ a:focus-visible {
   }
 }
 
+/* ─── Responsive ─────────────────────────────────────────── */
 @media (max-width: 920px) {
   .nav-links {
     display: none;

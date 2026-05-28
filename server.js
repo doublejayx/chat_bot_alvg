@@ -1,8 +1,9 @@
 // ═══════════════════════════════════════════════════════════════
 //  AutomationX Gallery Server + Local RAG Pipeline
-//  LangChain v1.x · Ollama · MemoryVectorStore
+//  LangChain v1.x · Ollama · HNSWLib (persistent)
 // ═══════════════════════════════════════════════════════════════
 
+const { getVectorStore } = require('./knowledgebase');
 const http = require('http');
 const fs   = require('fs');
 const path = require('path');
@@ -17,126 +18,68 @@ const CONFIG = {
     llmModel:          'llama3',
     embeddingModel:    'nomic-embed-text',
     dataFile:          './data/avalant_media.txt',
-    ragTimeoutMs:      6500,
+    ragTimeoutMs:      15000,
     forwardWebhookUrl: null,
 };
 // ═══════════════════════════════════════════════════════════════
 
-let ragChain = null;
-let ragReady = false;
-let ragError = null;
+let ragChain  = null;
+let ragReady  = false;
+let ragError  = null;
 
 const FALLBACK_KNOWLEDGE = {
     location:
         'Avalant ตั้งอยู่ที่ 20 อาคารบุปผจิต ชั้น 15 ถนนสาทรเหนือ แขวงสีลม เขตบางรัก กรุงเทพมหานคร 10500 ค่ะ',
     about:
         'Avalant Co., Ltd. เป็นบริษัทเทคโนโลยีไทยที่ให้บริการ Digital Platform ระดับองค์กร มีความเชี่ยวชาญด้าน Software, AI, Low-Code และโซลูชันองค์กร โดยก่อตั้งในปี พ.ศ. 2545',
-    ai:
-        'Avalant มีแนวคิด AI First และนำ AI มาช่วยพัฒนาโซลูชันองค์กร เช่น งาน HR, Customer Service, Workflow, Data & AI และแพลตฟอร์ม Low-Code อย่าง ONEWEB/Promptx',
     products:
         'ข้อมูลเด่นของ Avalant ได้แก่ ONEWEB แพลตฟอร์ม Low-Code, Promptx สำหรับช่วยสร้างต้นแบบแอปและเอกสารด้วย AI รวมถึงโซลูชัน IBM Automation, Integration และ Data & AI',
 };
 
+// ───────────────────────────────────────────────
+// FALLBACK (ใช้เมื่อ RAG ไม่พร้อม)
+// ───────────────────────────────────────────────
 function getFallbackAnswer(message) {
-    const text = message.toLowerCase();
+    const text    = message.toLowerCase();
     const compact = text.replace(/\s+/g, '');
 
     if (!compact.includes('avalant') && !compact.includes('อวาลันท์') && !compact.includes('อวาแลนท์')) {
         return null;
     }
-
-    if (
-        compact.includes('อยู่ที่ไหน') ||
-        compact.includes('ที่อยู่') ||
-        compact.includes('location') ||
-        compact.includes('address') ||
-        compact.includes('office')
-    ) {
+    if (compact.includes('อยู่ที่ไหน') || compact.includes('ที่อยู่') || compact.includes('location') || compact.includes('address')) {
         return FALLBACK_KNOWLEDGE.location;
     }
-
-    if (
-        compact.includes('คือ') ||
-        compact.includes('เกี่ยวกับ') ||
-        compact.includes('about') ||
-        compact.includes('tellme') ||
-        compact.includes('บริษัท')
-    ) {
+    if (compact.includes('คือ') || compact.includes('เกี่ยวกับ') || compact.includes('about') || compact.includes('บริษัท')) {
         return FALLBACK_KNOWLEDGE.about;
     }
-
-    if (
-        compact.includes('ai') ||
-        compact.includes('promptx') ||
-        compact.includes('oneweb') ||
-        compact.includes('lowcode') ||
-        compact.includes('โลว์โค้ด') ||
-        compact.includes('product') ||
-        compact.includes('solution')
-    ) {
+    if (compact.includes('ai') || compact.includes('promptx') || compact.includes('oneweb') || compact.includes('product') || compact.includes('solution')) {
         return FALLBACK_KNOWLEDGE.products;
     }
-
     return `${FALLBACK_KNOWLEDGE.about}\n\n${FALLBACK_KNOWLEDGE.location}`;
 }
 
 // ───────────────────────────────────────────────
-// INIT RAG
+// INIT RAG (เวอร์ชันเดียว ใช้ knowledgebase.js)
 // ───────────────────────────────────────────────
 async function initRAG() {
     try {
         console.log('🔧 Initializing RAG pipeline...');
 
-        // ── LangChain v1.x imports ──────────────────────────────
         const { Ollama }             = await import('@langchain/ollama');
-        const { OllamaEmbeddings }   = await import('@langchain/ollama');
-        const { MemoryVectorStore }  = await import('@langchain/classic/vectorstores/memory');
-        const { RecursiveCharacterTextSplitter } = await import('@langchain/textsplitters');
-        const { Document }           = await import('@langchain/core/documents');
         const { ChatPromptTemplate } = await import('@langchain/core/prompts');
-        const { createRetrievalChain } = await import('@langchain/classic/chains/retrieval');
-        const { createStuffDocumentsChain } = await import('@langchain/classic/chains/combine_documents');
 
-        // 1. โหลดไฟล์ข้อมูลบริษัทด้วย fs โดยตรง (ไม่ใช้ TextLoader เพื่อหลีกเลี่ยง path issue)
-        if (!fs.existsSync(CONFIG.dataFile)) {
-            throw new Error(`ไม่พบไฟล์: ${CONFIG.dataFile}\nสร้างโฟลเดอร์ data/ และไฟล์ avalant_media.txt ก่อน`);
-        }
-        const rawText = fs.readFileSync(CONFIG.dataFile, 'utf-8');
-        const rawDocs = [new Document({
-            pageContent: rawText,
-            metadata:    { source: CONFIG.dataFile },
-        })];
-        console.log(`📄 Loaded: ${CONFIG.dataFile} (${rawText.length} chars)`);
-
-        // 2. ตัดข้อความเป็น chunk
-        const splitter = new RecursiveCharacterTextSplitter({
-            chunkSize:    500,
-            chunkOverlap: 50,
-        });
-        const docs = await splitter.splitDocuments(rawDocs);
-        console.log(`✂️  Split into ${docs.length} chunks`);
-
-        // 3. Embeddings (Ollama)
-        const embeddings = new OllamaEmbeddings({
-            model:   CONFIG.embeddingModel,
-            baseUrl: CONFIG.ollamaBaseUrl,
-        });
-
-        // 4. MemoryVectorStore
-        const vectorStore = await MemoryVectorStore.fromDocuments(docs, embeddings);
+        // โหลด vector store จาก disk (หรือสร้างใหม่อัตโนมัติถ้ายังไม่มี)
+        const vectorStore = await getVectorStore(CONFIG.ollamaBaseUrl, CONFIG.embeddingModel);
         const retriever   = vectorStore.asRetriever({ k: 4 });
         console.log('🗄️  Vector store ready');
 
-        // 5. LLM (Ollama)
         const llm = new Ollama({
             model:       CONFIG.llmModel,
             baseUrl:     CONFIG.ollamaBaseUrl,
             temperature: 0.3,
         });
 
-        // 6. Prompt Template
-        const prompt = ChatPromptTemplate.fromTemplate(`
-คุณเป็นผู้ช่วย AI ของบริษัท Avalant ตอบคำถามโดยใช้ข้อมูลที่ให้มาเท่านั้น
+        const prompt = ChatPromptTemplate.fromTemplate(`คุณเป็นผู้ช่วย AI ของบริษัท Avalant ตอบคำถามโดยใช้ข้อมูลที่ให้มาเท่านั้น
 ถ้าไม่มีข้อมูลในบริบท ให้ตอบว่า "ขออภัย ไม่มีข้อมูลในส่วนนี้ค่ะ"
 ตอบเป็นภาษาไทยเสมอ กระชับ และชัดเจน
 
@@ -147,33 +90,36 @@ async function initRAG() {
 
 คำตอบ:`);
 
-        // 7. Retrieval Chain
-        const docChain = await createStuffDocumentsChain({ llm, prompt });
-        ragChain = await createRetrievalChain({
-            retriever,
-            combineDocsChain: docChain,
-        });
-
-        ragReady = true;
+        ragChain  = { retriever, llm, prompt };
+        ragReady  = true;
         console.log('✅ RAG pipeline ready!\n');
 
     } catch (err) {
         ragError = err.message;
         console.error('❌ RAG init failed:', err.message);
-        console.warn('⚠️  Running without RAG (image-only mode)\n');
+        console.warn('⚠️  Running in fallback mode\n');
     }
 }
 
+// ───────────────────────────────────────────────
+// QUERY RAG
+// ───────────────────────────────────────────────
 async function queryRAG(question) {
     if (!ragReady || !ragChain) return null;
     try {
         const result = await Promise.race([
-            ragChain.invoke({ input: question }),
-            new Promise((_, reject) => {
-                setTimeout(() => reject(new Error(`RAG timed out after ${CONFIG.ragTimeoutMs}ms`)), CONFIG.ragTimeoutMs);
-            }),
+            (async () => {
+                const docs    = await ragChain.retriever.invoke(question);
+                const context = docs.map(d => d.pageContent).join('\n\n---\n\n');
+                const messages = await ragChain.prompt.formatMessages({ context, input: question });
+                const response = await ragChain.llm.invoke(messages);
+                return typeof response === 'string' ? response : response.content;
+            })(),
+            new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('RAG timeout')), CONFIG.ragTimeoutMs)
+            ),
         ]);
-        return result.answer?.trim() || null;
+        return result?.trim() || null;
     } catch (err) {
         console.error('RAG query error:', err.message);
         return null;
@@ -213,7 +159,7 @@ const server = http.createServer((req, res) => {
 
                 let responseText = '';
 
-                // 1. ถาม RAG
+                // 1. ถาม RAG ก่อน
                 if (ragReady) {
                     const ragAnswer = await queryRAG(message);
                     if (ragAnswer && !ragAnswer.includes('ไม่มีข้อมูล')) {
@@ -222,12 +168,12 @@ const server = http.createServer((req, res) => {
                     }
                 }
 
-                // 2. Fallback: ตอบข้อมูล Avalant พื้นฐานเมื่อ RAG/Ollama ยังไม่พร้อม
+                // 2. Fallback ข้อมูล Avalant พื้นฐาน
                 if (!responseText) {
                     responseText = getFallbackAnswer(message) || '';
                 }
 
-                // 3. Fallback: เช็คชื่อรูปภาพ
+                // 3. เช็คชื่อรูปภาพ
                 if (!responseText) {
                     const imagesDir  = path.join(__dirname, 'images');
                     const extensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
@@ -239,7 +185,7 @@ const server = http.createServer((req, res) => {
                     }
                     responseText = found
                         ? `✅ เพิ่มรูป "${msgLow}" ลงแกลเลอรีแล้ว!`
-                        : `ขออภัย ไม่มีข้อมูลในส่วนนี้ค่ะ`;
+                        : 'ขออภัย ไม่มีข้อมูลในส่วนนี้ค่ะ';
                 }
 
                 res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
@@ -261,7 +207,7 @@ const server = http.createServer((req, res) => {
     fs.readFile(filePath, (err, data) => {
         if (err) { res.writeHead(404); res.end('404 Not Found'); return; }
         const mimeTypes = {
-            '.html': 'text/html; charset=utf-8', '.css':  'text/css',
+            '.html': 'text/html; charset=utf-8', '.css': 'text/css',
             '.js':   'application/javascript',   '.json': 'application/json',
             '.jpg':  'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png',
             '.gif':  'image/gif',  '.webp': 'image/webp', '.svg': 'image/svg+xml',

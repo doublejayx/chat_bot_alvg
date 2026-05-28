@@ -7,6 +7,7 @@
     "@langchain/ollama": "^1.2.7",
     "@langchain/textsplitters": "^1.0.1",
     "langchain": "^1.4.2",
-    "showdown": "^2.1.0"
+    "showdown": "^2.1.0",
+    "vectra": "^0.15.0"
   }
 }
