@@ -226,6 +226,9 @@
         </div>
 
         <div class="chat-header-actions">
+          <button class="chat-action-btn" type="button" onclick="resetChat()" aria-label="Reset Chat">
+            <i data-lucide="refresh-cw" style="width:18px; height:18px;"></i>
+          </button>
           <button class="chat-action-btn" id="fullscreenBtn" type="button" onclick="toggleFullscreen(event)" aria-label="Expand AI Assistant">
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path id="fullscreenIcon" d="M4 4h7v2H7.4l4.1 4.1-1.4 1.4L6 7.4V11H4V4Zm16 0v7h-2V7.4l-4.1 4.1-1.4-1.4L16.6 6H13V4h7ZM6 16.6l4.1-4.1 1.4 1.4L7.4 18H11v2H4v-7h2v3.6Zm12 0V13h2v7h-7v-2h3.6l-4.1-4.1 1.4-1.4 4.1 4.1Z" />
@@ -368,6 +371,16 @@
         setFullscreen(false);
       }
     }
+    // 👇 เพิ่มฟังก์ชันนี้ลงไป 👇
+    function resetChat() {
+      const messagesContainer = document.getElementById('chatMessages');
+      const quickReplies = document.getElementById('quickReplies');
+      
+      messagesContainer.innerHTML = ''; // ล้างข้อความแชทเก่าทิ้งทั้งหมด
+      appendBotMessage(CONFIG.welcomeMessage); // ใส่ข้อความต้อนรับกลับเข้ามาใหม่
+      quickReplies.style.removeProperty('display'); // เรียกปุ่มคำถามแนะนำกลับมาแสดง
+    }
+    // 👆 สิ้นสุดโค้ดที่เพิ่ม 👆
 
     function toggleFullscreen(event) {
       event?.stopPropagation();

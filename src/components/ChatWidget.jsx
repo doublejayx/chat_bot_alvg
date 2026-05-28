@@ -9,6 +9,7 @@ import {
   Maximize2,
   MessageSquare,
   Minimize2,
+  RefreshCw,
   Sparkles,
   ThumbsUp,
   Copy,
@@ -47,6 +48,8 @@ function resolveFallback(question, reply = '') {
   const isAvalantQuestion =
     normalized.includes('avalant') ||
     normalized.includes('อวาลันท์') ||
+    normalized.includes('อัฟวาลันท์') ||
+    normalized.includes('อัฟวาแลนท์') ||
     normalized.includes('อวาแลนท์');
   if (!replyLooksEmpty || !isAvalantQuestion) return '';
   if (
@@ -381,6 +384,17 @@ function ChatPanel({ apiEndpoint = '/chat', onClose }) {
   const scrollRef = useRef(null);
   const inputRef = useRef(null);
   const sendBtnRef = useRef(null);
+  
+  const handleResetChat = () => {
+    setMessages([
+      {
+        id: 'welcome',
+        role: 'assistant',
+        text: 'Hi, I am your AI Assistant. Ask me about Avalant, dashboard insights, or adding an image.',
+        time: formatTime(),
+      },
+    ]);
+  };
 
   const canSend = useMemo(() => inputValue.trim().length > 0 && !isSending, [inputValue, isSending]);
 
@@ -417,6 +431,12 @@ function ChatPanel({ apiEndpoint = '/chat', onClose }) {
     }
   };
 
+  const playSound = () => {
+    const audio = new Audio('/sounds/pop up.mp3');
+    audio.volume = 0.5; // ปรับความดังให้ฟังสบายๆ
+    audio.play().catch(() => {}); // catch ไว้เผื่อเบราว์เซอร์บล็อก Autoplay
+  };
+
   const sendMessage = async rawText => {
     const text = rawText.trim();
     if (!text || isSending) return;
@@ -447,6 +467,7 @@ function ChatPanel({ apiEndpoint = '/chat', onClose }) {
           time: formatTime(),
         },
       ]);
+      playSound(); // เล่นเสียงตอนที่บอทตอบกลับ
     } catch {
       const botId = `assistant-${Date.now()}`;
       setLatestBotId(botId);
@@ -459,6 +480,7 @@ function ChatPanel({ apiEndpoint = '/chat', onClose }) {
           time: formatTime(),
         },
       ]);
+      playSound(); // เล่นเสียงตอนที่บอทตอบกลับ (แม้จะ Error)
     } finally {
       setIsTyping(false);
       setIsSending(false);
@@ -500,6 +522,7 @@ function ChatPanel({ apiEndpoint = '/chat', onClose }) {
               backgroundSize: '300% 300%',
             }}
           />
+          
           {/* Mesh overlay */}
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(255,255,255,.18),transparent_60%)]" />
           {/* Subtle grid */}
@@ -538,6 +561,16 @@ function ChatPanel({ apiEndpoint = '/chat', onClose }) {
           </div>
 
           <div className="relative flex items-center gap-1">
+            <motion.button
+              type="button"
+              onClick={handleResetChat}
+              whileHover={{ scale: 1.1, rotate: 180 }}
+              whileTap={{ scale: 0.9 }}
+              aria-label="เริ่มแชทใหม่"
+              className="grid h-8 w-8 place-items-center rounded-full bg-white/15 text-white transition hover:bg-white/28"
+            >
+              <RefreshCw size={15} />
+            </motion.button>
             <motion.button
               type="button"
               onClick={() => setIsExpanded(v => !v)}
